@@ -17,18 +17,6 @@ conn = pymysql.connect(host='127.0.0.1',
                          charset='utf8mb4',
                          cursorclass=pymysql.cursors.DictCursor)
 
-@app.before_request #for security purposes
-def make_session_permanent():
-    session.permanent = True
-    app.permanent_session_lifetime = timedelta(minutes=30)
- 
-
-@app.route('/')
-def index():
-
-    if 'logged_in' in session:
-        return redirect(url_for('mainPage'))
-    return render_template('main.html')
 
 class RegisterForm(Form):
     first_name = StringField('First Name', [validators.Length(min=1, max=50)])#conditions
@@ -40,6 +28,21 @@ class RegisterForm(Form):
             validators.Length(min=5, max=100)
         ])
     confirm = PasswordField('Confirm Password')
+#checks if logged in before allowing user to do things
+@app.before_request #for security purposes
+def make_session_permanent():
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(minutes=30)
+ 
+#main page of site
+@app.route('/')
+def index():
+
+    if 'logged_in' in session:
+        return redirect(url_for('mainPage'))
+    return render_template('main.html')
+
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -70,6 +73,13 @@ def register():
             flash('You are now registered. Please log in.') 
             return redirect(url_for('login'))
     return render_template('register.html', form=form)
+  
+#to log out
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash('You are now logged out', 'success')
+    return render_template('main.html')
 
 @app.route('/login', methods=['POST','GET'])
 def login():
@@ -81,18 +91,18 @@ def login():
         #retrieves data from DB to check if in sys
         query = cur.execute("SELECT * FROM Person WHERE email = %s", [username])
 
-        
+       
         if(query > 0):
             data = cur.fetchone()
             password = data['password']
 
-            # Compare 
+            # Compares password
             if (password_candidate == password): #input valid
                 session['logged_in'] = True
                 session['username'] = username
                 flash("You are now logged in", "success")
                 return redirect(url_for("mainPage"))
-            else:
+            else: #if password is wrong, it redirects you back to login page to try again
                 error = "Incorrect password"
                 return render_template("login.html", error=error)
             
@@ -114,12 +124,7 @@ def is_logged_in(f):
             return redirect(url_for('login'))
     return wrap
 
-#to log out
-@app.route("/logout")
-def logout():
-    session.clear()
-    flash('You are now logged out', 'success')
-    return render_template('main.html')
+
 
 @app.route('/mainPage')
 @is_logged_in
@@ -130,24 +135,23 @@ def mainPage():
     cursor.execute(query, (username))
     data = cursor.fetchall()
     
-    query2 = 'SELECT Comment.post_time, comment_text, Comment.item_id, Comment.email FROM Comment JOIN ContentItem on Comment.item_id = ContentItem.item_id WHERE is_pub = 1 or ContentItem.email_post = %s ORDER BY item_id DESC'    
-    cursor.execute(query2, (username))
+    commentQuery = 'SELECT Comment.post_time, comment_text, Comment.item_id, Comment.email FROM Comment JOIN ContentItem on Comment.item_id = ContentItem.item_id WHERE is_pub = 1 or ContentItem.email_post = %s ORDER BY item_id DESC'    
+    cursor.execute(commentQuery, (username))
     comments = cursor.fetchall()
-        
-    query3 = 'SELECT Tag.tagtime, Tag.email_tagged,Tag.email_tagger, Tag.item_id, Person.fname, Person.lname FROM Tag NATURAL JOIN Person WHERE Tag.email_tagged = Person.email ORDER BY item_id DESC'
-    cursor.execute(query3,)
-    tags = cursor.fetchall()
     
-
-    query4 = 'SELECT fg_name FROM FriendGroup WHERE owner_email = %s'
-    cursor.execute(query4,(username))
+    fgName = 'SELECT fg_name FROM FriendGroup WHERE owner_email = %s'
+    cursor.execute(fgName,(username))
     groups = cursor.fetchall()
     #only creator of the group has permission to share
+        
+    retrieveTag = 'SELECT Tag.tagtime, Tag.email_tagged,Tag.email_tagger, Tag.item_id, Person.fname, Person.lname FROM Tag NATURAL JOIN Person WHERE Tag.email_tagged = Person.email ORDER BY item_id DESC'
+    cursor.execute(retrieveTag,)
+    tags = cursor.fetchall()
    
 
     tagged_query = 'SELECT DISTINCT ContentItem.post_time, item_name, ContentItem.item_id FROM ContentItem JOIN Tag ON ContentItem.item_id = Tag.item_id WHERE (email_tagged = %s) AND (status = 1) ORDER BY post_time DESC'
     cursor.execute(tagged_query,(username))
-    data2 = cursor.fetchall()
+    tagData = cursor.fetchall()
 
     tagged_comments = 'SELECT DISTINCT Comment.item_id, Comment.post_time, comment_text, Comment.email\
     FROM Comment JOIN Tag on Comment.item_id = Tag.item_id WHERE status = 1 and email_tagged= %s ORDER BY item_id DESC'
@@ -159,8 +163,8 @@ def mainPage():
     where Member.email = %s order by post_time desc"
     cursor.execute(shared_query,(username))
     shared_posts = cursor.fetchall()
-
-
+    
+    #checks if posts shared have comments
 
     shared_comments = 'SELECT DISTINCT Comment.item_id, Comment.post_time, comment_text, Comment.email \
     FROM Comment JOIN Share on Comment.item_id = Share.item_id JOIN Member on Share.fg_name = Member.fg_name \
@@ -171,7 +175,7 @@ def mainPage():
     cursor.close()
     
     return render_template('mainPage.html', username=username, posts=data,\
-            comments=comments, tags = tags, taggedposts = data2, groups=groups,\
+            comments=comments, tags = tags, taggedposts = tagData, groups=groups,\
             shared_posts = shared_posts, comments_tagged = comments_tagged, \
             comments_shared = comments_shared)
 
@@ -188,8 +192,8 @@ def add_friends():
     owner = request.form["creator"]
     cur = conn.cursor()
     
-    query2 = "SELECT * FROM Member WHERE email = %s && fg_name = %s"
-    cur.execute(query2, (username, group_name))
+    memberQuery = "SELECT * FROM Member WHERE email = %s && fg_name = %s"
+    cur.execute(memberQuery, (username, group_name))
     data = cur.fetchone()
     #checks if person is already friends with user
     if (data):
@@ -229,11 +233,11 @@ def post():
             return redirect(url_for('mainPage'))
 
         elif pub_status == False:
-            query = 'INSERT INTO ContenItem (item_name, email_post, post_time is_pub) VALUES(%s, %s, %s, %s)'
-            cursor.execute(query, (content_name, username, timestamp, pub_status))
+            insContent = 'INSERT INTO ContenItem (item_name, email_post, post_time is_pub) VALUES(%s, %s, %s, %s)'
+            cursor.execute(insContent, (content_name, username, timestamp, pub_status))
 
-            maxValQuery = 'SELECT MAX(item_id) FROM ContentItem'
-            cursor.execute(maxValQuery)
+            maxIDQuery = 'SELECT MAX(item_id) FROM ContentItem'
+            cursor.execute(maxIDQuery)
             maxVal = cursor.fetchone()
             maxVal = maxVal['MAX(item_id)']
 
@@ -242,8 +246,8 @@ def post():
 
             cursor = conn.cursor()
             for group in listOfGroupNames:
-                query = 'INSERT INTO Share (item_id, fg_name, owner_email) VALUES (%s, %s, %s)'
-                cursor.execute(query, (maxVal, group, username))
+                groupIns = 'INSERT INTO Share (item_id, fg_name, owner_email) VALUES (%s, %s, %s)'
+                cursor.execute(groupIns, (maxVal, group, username))
             conn.commit()
             cursor.close()
             flash('You have successfully posted to private group', 'success')
@@ -262,8 +266,8 @@ def sharepost():
 
         cursor = conn.cursor()
 
-        q1 = 'INSERT INTO Share(item_id, fg_name, owner_email) VALUES (%s, %s, %s)'
-        cursor.execute(q1,(contentID, group_name, username))
+        shareIns = 'INSERT INTO Share(item_id, fg_name, owner_email) VALUES (%s, %s, %s)'
+        cursor.execute(shareIns,(contentID, group_name, username))
         flash('You have successfully shared the post with your group!', 'success')
         conn.commit()
         cursor.close()
@@ -282,17 +286,17 @@ def deletepost():
         cur=conn.cursor()
 
         #checks through everything to delete
-        q1 = "DELETE FROM Tag WHERE item_id = %s"
-        cur.execute(q1,(contentID))
+        query1 = "DELETE FROM Tag WHERE item_id = %s"
+        cur.execute(query1,(contentID))
 
-        q2 = "DELETE FROM Comment WHERE item_id = %s"
-        cur.execute(q2, (contentID))
+        query2 = "DELETE FROM Comment WHERE item_id = %s"
+        cur.execute(query2, (contentID))
 
-        q4 = "DELETE FROM Share WHERE item_id = %s"
-        cur.execute(q4,(contentID))
+        query4 = "DELETE FROM Share WHERE item_id = %s"
+        cur.execute(query4,(contentID))
 
-        q3 = "DELETE FROM ContentItem WHERE item_id = %s"
-        cur.execute(q3,(contentID))
+        query3 = "DELETE FROM ContentItem WHERE item_id = %s"
+        cur.execute(query3,(contentID))
 
         flash('You have deleted your post!', 'success')
         conn.commit()
@@ -490,17 +494,19 @@ def add_groups():
         #checks if user exists 
         query1 = 'SELECT COUNT(*) FROM Member WHERE email = %s AND fg_name = %s'
         if (cursor.execute(query1, (owner, group_name)) == 0):
+          #if user does not exist, insert information into Member and FriendGroup tables
            query2 = 'INSERT INTO Member (email, fg_name, owner_email)\VALUES(%s, %s, %s)'
            query3 = 'INSERT INTO FriendGroup (fg_name, owner_email, description)\VALUES(%s, %s, %s)'
            cursor.execute(query2, (owner, group_name, owner))
            cursor.execute(query3, (group_name, owner, description))
            conn.commit()
         
+        
         query4 = 'INSERT INTO FriendGroup (fg_name, owner_email, description) VALUES(%s, %s, %s)'
         cursor.execute(query4, (group_name, owner, description))
         
         listMems = mems.split(', ') #splits list of friends to be added
-        
+        #returns members that aren't sucessfully added for whatever reasons
         invalidMems = []
         for mem in listMems:
             #checks if member exists
@@ -516,11 +522,13 @@ def add_groups():
         cursor.close()
         #gives results
         if (len(invalidMems)!= 0):
+          #tells user which friends can't be added
             error = "Following friends could not be added: "
             for mem in invalidMems:
                 error = error + str(mem) + " "
             flash(error, "danger")
         else:
+          #alert at the top telling user that friendgroup was created
             flash('The friend group has been successfully added!', "success")
 
         return redirect(url_for('mainPage'))
@@ -529,7 +537,7 @@ def add_groups():
         flash('Timed out, please login again', 'danger')
         return redirect(url_for('login'))
 
-
+#main
 if __name__ == '__main__':
     app.secret_key = "database"
     app.run(debug=True)

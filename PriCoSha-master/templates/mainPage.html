@@ -1,0 +1,227 @@
+{% extends 'layout.html' %}  
+
+{% block body %}
+    <form action="/post" method="POST">
+        <h1>Welcome {{username}}</h1> 
+        <div class = "well">
+            <ul class="list-inline">
+                <li class="list-inline-item">
+                    <a href="/changePassword">Change Password</a>
+                </li>
+                <li class="list-inline-item">
+                    <a href="/changeUsername">Change Username</a>
+                </li>
+            </ul>
+        </div>
+        <input type="text" class = "form-control" name = "item_name" placeholder="Write Message Here" required/>
+        </br>
+        <input type="text" class = "form-control" name = "groupNames" id =
+        "groupNames" placeholder="Choose a group to share this post with privately"/>
+        <script>
+            $(document).ready(function () {
+
+                //Uncheck the CheckBox initially 
+                $('#chchbox').removeAttr('checked');  
+                // Initially, Hide the SSN textbox when Web Form is loaded 
+                $('#groupNames').hide(); 
+
+                $('#chckbox').click(function () {
+                    var $this = $(this);
+                    if ($this.is(':checked')) {
+                        $('#groupNames').show();
+                    } else {
+                        $('#groupNames').hide();
+                    }
+                });
+            });        
+        </script>
+        <label><input type ="checkbox" name = "p_status" id = "chckbox"/> Private </label> <br>
+        <input type="submit" class="btn btn-primary" value = Post />
+    </form>
+
+    <style type="text/css">
+        table, th, td{
+            margin-top: 1cm;
+        }
+    </style>
+
+    <h2>Your Posts</h2>
+    <table class = "table">
+        <thead class="blue-grey lighten-4">
+            <tr>
+                <th>Time</th>
+                <th>Post</th>
+                <th>Tag</th>
+                <th>Comment</th>
+                <th>Share</th>
+                <th>Delete</th>
+                <th>File Path</th>
+            
+            </tr>
+        </thead>
+        {% for line in posts %}
+            <tr>
+                <td>{{line.post_time}}</td>
+                <td>{{line.item_name}}</td>
+                <td>
+                   <input type="button" class="btn btn-outline-primary" onclick="showTags();" value="Show Tags" />
+                   
+                    <div id="showtags">
+                        {% for tag in tags %}
+                            {% if line.item_id == tag.item_id %}
+                                <p>{{tag.email_tagged}} {{tag.tagtime}} </p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <br/>
+                    
+                    <form action="/tag" method="POST">
+                        <input type="hidden" name="contentID" value="{{line.item_id}}" placeholder="Content ID Number Confirm">
+                        <input type="text" name="taggee" placeholder="Username">
+                        <button type="submit" class="btn btn-primary btn-sm">Tag</button>
+                    </form>
+                </td>
+                <td>
+                   <input type="button" class="btn btn-outline-primary" onclick="showComments();" value="Show Comment" />
+                    <div id="showcomments">
+                        {% for com in comments %} 
+                            {% if line.item_id == com.item_id %}
+                                <p>{{com.post_time}}: {{com.email}}: {{com.comment_text}}</p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <form action="/comment" method="POST">
+                        <input type="hidden" name="commentID" value="{{line.item_id}}">
+                        <input type="text" name="comment" placeholder="Comment">
+                        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+                    </form>
+                </td>
+
+                <td>
+                    <form action="/sharepost" method="POST">
+                        <input type="hidden" name="contentID" value="{{line.item_id}}">
+                        <select name="group_name">
+                            {% for group in groups %}
+                        <option value="{{group.fg_name}}">{{ group.fg_name }}</option>    
+                        {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">Share</button>                    </form>
+                    </form>
+                </td>
+                <td>
+                        <form action="/deletepost" method="POST">
+                            <input type="hidden" name="contentID" value="{{line.item_id}}">
+
+                            <button type="submit" class="btn btn-primary btn-sm">Delete</button>                        </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <br />
+    <h2>Tagged Posts</h2>
+    <table class = "table">
+        <!--Table head-->
+        <thead class="blue-grey lighten-4">
+            <tr>
+                <th>Time</th>
+                <th>Post</th>
+                <th>Tag</th>
+                <th>Comment</th>
+            </tr>
+        </thead>
+        {% for line in taggedposts %}
+            <tr>
+                <td>{{line.tagtime}}</td>
+                <td>{{line.item_id}}</td>
+                <td>
+                    <div id="showtags">
+                        {% for tag in tags %}
+                            {% if line.item_id == tag.item_id  %}
+                                <p>Tagger: {{tag.email_tagger}} Tagged: {{tag.email_tagged}}</p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <br/>
+                    
+                    <form action="/tag" method="POST">
+                        <input type="hidden" name="contentID" value="{{line.id}}">
+                        <input type="text" name="taggee" placeholder="Username">
+                        <button type="submit" class="btn btn-primary btn-sm">Tag</button>
+                    </form>
+                </td>
+                <td>
+                    <div id="showcomments">
+                        {% for com in comments_tagged %} 
+                            {% if line.id == com.id %}
+                                <p>{{com.post_time}}: {{com.email}}: {{com.comment_text}}</p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <form action="/comment" method="POST">
+                        <input type="hidden" name="commentID" value="{{line.id}}">
+                        <input type="text" name="comment" placeholder="Comment">
+                        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <br />
+    <h2>Shared Posts</h2>
+    <table class = "table">
+            <!--Table head-->
+            <thead class="blue-grey lighten-4">
+                <tr>
+                    <th>Time</th>
+                    <th>Post</th>
+                    <th>Tag</th>
+                    <th>Comment</th>
+                </tr>
+            </thead>
+            {% for line in shared_posts %}
+                <tr>
+                    <td>{{line.tagtime}}</td>
+                    <td>{{line.item_id}}</td>
+                    <td>
+                        <div id="showtags">
+                            {% for tag in tags %}
+                                {% if line.item_id == tag.item_id  %}
+                                    <p>Tagger: {{tag.email_tagger}} Tagged: {{tag.email_tagged}}</p>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        
+                        <br/>
+                        
+                        <form action="/tag" method="POST">
+                            <input type="hidden" name="contentID" value="{{line.id}}">
+                            <input type="text" name="taggee" placeholder="Username">
+                            <button type="submit" class="btn btn-primary btn-sm">Tag</button>
+                        </form>
+                    </td>
+                    <td>
+                        <div id="showcomments">
+                            {% for com in comments_tagged %} 
+                                {% if line.id == com.id %}
+                                    <p>{{com.post_time}}: {{com.email}}: {{com.comment_text}}</p>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        
+                        <form action="/comment" method="POST">
+                            <input type="hidden" name="commentID" value="{{line.id}}">
+                            <input type="text" name="comment" placeholder="Comment">
+                            <button type="submit" class="btn btn-primary btn-sm">Add</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+
+{% endblock %}

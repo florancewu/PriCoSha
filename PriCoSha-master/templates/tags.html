@@ -1,0 +1,40 @@
+<html>
+        <head></head>
+        <body>
+        {% extends 'mainPage.html' %} {% block body %}
+            <h2> Manage Tags </h2>
+            <table class = "table">
+            <thead class="blue-grey lighten-4">
+                    <tr>
+                        <th>Posts You're Tagged In</th>
+                    </tr>
+                </thead>
+    
+            <td>
+            {% for pendingTag in pendingTags %}
+                <ul>
+                {{ pendingTag.email_tagger }} tagged you in a post (content ID = {{ pendingTag.item_id }}) : {{pendingTag.item_name}}
+    
+                    <form action = "/manageTags" method = "POST"> 
+                        <input type="hidden" name="tagger" value = "{{ pendingTag.username_tagger }}">
+                        <input type="hidden" name="id" value = "{{ pendingTag.id }}">
+                        <select name="approval">
+                                <option value="accept">Accept</option>
+                                <option value="decline">Decline</option>
+                        </select>
+                            <input type="submit" class="btn btn-primary btn-sm" value = "Submit">
+                    </form>
+                    <li> {{pendingTag._item_name}} </li>
+                </ul>
+                    <h2>
+    
+                    </h2>
+      
+    
+            {% endfor %}
+            </td>
+    
+    
+            {% endblock %}
+        </body>
+    </html>

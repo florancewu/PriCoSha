@@ -1,6 +1,6 @@
 # PriCoSha
 
-PriCoSha is a platform for users to connect with their family and friends. It allows users to share content, tag their friends, and post comments. Users can create specified groups to share content privately. Posts can be managed through deletion. Groups can be deleted, but any deletions are permanen
+PriCoSha is a platform for users to connect with their family and friends. It allows users to share content, tag their friends, and post comments. Users can create specified groups to share content privately. Posts can be managed through deletion. Groups can be deleted, but any deletions are permanent.
 
 Login - A user with an existing account can log in to the platform using their email address and password. Once they input their information and submit, the system validates the input by querying the Person table in the database and checks if the password and email matches. If their information is verified, the system will redirect user to the main page that displays their feed.
 
